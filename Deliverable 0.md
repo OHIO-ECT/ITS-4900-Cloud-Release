@@ -175,7 +175,7 @@ $azVmParams = @{
 
 ```New-AzVm @azVmParams```
 
-34. Yep, it breaks for Brandon at this point. It might be a licensing issue that unique to his user.  Please report to him via Teams if you are able to build a VM..
+34. Yep, it breaks for Brandon at this point. It might be a licensing issue that unique to his user.  Please report to him via Teams if you are able to build a VM.
 
 
 # A list of failed links and leads
