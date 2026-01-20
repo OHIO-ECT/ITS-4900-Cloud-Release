@@ -63,7 +63,7 @@ Login via code to an arbitrary (likely more trusted) web browser:
 
 17. Later in Unit 5, list the Resource Groups before creating any. Set up a resource group for this class.
 
-`New-AzResourceGroup -Name ITS-Cloud-Systems -Location eastus`
+`New-AzResourceGroup -Name ITS-Cloud-Systems -Location westus2`
 
 18. The remainder of Unit 5 is informational about the options of setting up a virtual machine. Do not run any of the remaining commands.
 
@@ -98,13 +98,13 @@ $azVmParams = @{
     PublicIpAddressName = 'testvm-eus-01'
 }
 ```
-22. The suggested PowerShell command for creating a VM makes certain assumptions that need to be considered before blindly running the command. In particular, the Resource group name must equal `ITS-Cloud-Systems` to match the previous configurations. Students will need to be aware of this from the beginning.
+22. The suggested PowerShell command for creating a VM makes certain assumptions that need to be considered before blindly running the command. In particular, the Resource group name must equal `ITS-Cloud-Systems` to match the previous configurations.
 
 23. This class will also extend the VM name and other resource names to make sure they are identified to a lab.
 
 24. The Credential will be the username and password impressed into the system for initial access. The `(Get-Credential)` runs the PS command `Get-Credential` which prompts the user for input and then places the responses into the variable to be used later in the process.
 
-25. This class will always use the `eastus` location; other locations would be relevant for use cases not in the eastern part of the United States.
+25. As was discovered in the early development of this class, the free tier of resources are not available in every region and This class will always use the `westus2` location; other locations would be relevant for use cases not in the eastern part of the United States.
 
 ```
 #DO NOT RUN THIS YET!!!
@@ -112,7 +112,7 @@ $azVmParams = @{
     ResourceGroupName   = 'ITS-Cloud-Systems'
     Name                = 'del01-testvm-eus-01'
     Credential          = (Get-Credential)
-    Location            = 'eastus'
+    Location            = 'westus2'
     Image               = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest'
     OpenPorts           = 22
     PublicIpAddressName = 'del01-testvm-eus-0101'
@@ -123,11 +123,11 @@ $azVmParams = @{
 
 27. This list of publishers is quite extensive so it is generally necessary to have the beginning of a target. The following command pipe will show the names likely related to the maintainer of the Ubuntu Linux distribution, Canonical.
 
-`Get-AzVMImagePublisher -Location 'eastus' | Where-Object {$_.PublisherName -like '*Canonical*'}`
+`Get-AzVMImagePublisher -Location 'westus2' | Where-Object {$_.PublisherName -like '*Canonical*'}`
 
 28. The following command will list the disk image offerings by Canonical.
 
-`Get-AzVMImageOffer -Location 'eastus' -PublisherName 'Canonical'`
+`Get-AzVMImageOffer -Location 'westus2' -PublisherName 'Canonical'`
 
 29. Readers should notice that there are several variations in the type of image. Failure to understand a vendor's release and maintenance cycles for various offerings can open a system up to significant security and operational hazards. [Ubuntu Release Cycle and support](https://ubuntu.com/about/release-cycle). The automation principles to be studied in this class can mitigate many of those risks, IF DONE PROPERLY AND IN COLLABORATION WITH THE DEVELOPERS OF THE APPLICATION. In particular, "server" is a typical image, but there are other options for "minimized" environments or for subscription support services "pro", "daily" releases with the latest updates preinstalled, or "aks" images that are optimized for Kubernetes. Unless instructed otherwise, use a typical server version. While different vendors may choose other naming schemas, operational constructs like these are common across other vendors.
 
@@ -149,23 +149,72 @@ $azVmParams = @{
     ResourceGroupName   = 'ITS-Cloud-Systems'
     Name                = 'del01-testvm-eus-01'
     Credential          = (Get-Credential)
-    Location            = 'eastus'
+    Location            = 'westus2'
     Image               = 'Canonical:ubuntu-24_04-lts:server:latest'
     OpenPorts           = 22
     PublicIpAddressName = 'del01-testvm-eus-0101'
 }
 ```
 
-32. These are not the only parameters that are available for the deployment of a new VM. There are also different sizes of machines that are available. There is a whole marketplace for different CPU, memory, and storage capacities that are available, but only a few of them are available for free use by the student. In particular, this course will generally use the `Standard_B1s` server size.
+32. These are not the only parameters that are available for the deployment of a new VM. There are also different sizes of machines that are available. There is a whole system for sizes of VM resources.  Each cloud product is likely to have a different sizing model associated with it.  Virtual compute is one of the more complex.  [Microsoft Azure Virtual Machine size naming convention](https://learn.microsoft.com/en-us/azure/virtual-machines/vm-naming-conventions)  This forces uses to choose from a standard set of capacities CPU and memory.  As new underlying servers are deployed new releases of these "Sizes" do as well.  This also means that different regions are likely to have different sizes and service availability.  The student accounts are also further restricted making sizing of server additional difficult.
+
+33. The following command queries for the Azure Policy that is applied to the account.  While this is an editable list but it represents Microsoft's intentions, and this class will honor those.  Keep this list handy.
+
+```
+(Get-AzPolicyAssignment | 
+    Where-Object {$_.DisplayName -like '*deployment*' -or $_.DisplayName -like '*Allowed resource*'}).Parameter.listOfAllowedLocations.value
+```
+
+34. There are particular product offerings (SKUs) in each location.  The following command will show the full list of Virtual Machines that are available in the WestUS2 region.
+
+```
+Get-AzComputeResourceSku -Location 'westus2' |                                                  
+     Where-Object { $_.ResourceType -like 'virtualMachines'}
+```
+
+35.  This is a rather exhaustive list, many of which are not relevant for this class.  For this lab a simple VM with the lowest performance qualities is all that is necessary.  Through several iterations of guess and check it has been found that Version 2 (`_v2`) of the "Standard_B" Size with one or two CPUs is the lowest readily available.   
+
+```
+Get-AzComputeResourceSku -Location 'westus2' |                                                  
+     Where-Object {$_.Name -like 'Standard_B[12][a-z]*'} |
+     Format-Table -Wrap -AutoSize
+```
+
+36. The output of this table has some complexities.  Even though the Size(Name) exists in the region(location) and zones many of them still have restrictions.  There are two patterns to observe here.
+
+```
+PS /home/itsvm> Get-AzComputeResourceSku -Location 'westus2' |                                                  
+>>      Where-Object {$_.Name -like 'Standard_B[12][a-z]*'} |
+>>      Format-Table -Wrap -AutoSize
+
+ResourceType                 Name Location     Zones RestrictionInfo
+------------                 ---- --------     ----- ---------------
+virtualMachines     Standard_B1ls  westus2 {1, 2, 3} {type: Location, locations: westus2, type: Zone, locations: westus2, zones: 1, 2, 3}
+virtualMachines     Standard_B1ms  westus2 {1, 2, 3} {type: Location, locations: westus2, type: Zone, locations: westus2, zones: 1, 2, 3}
+virtualMachines      Standard_B1s  westus2 {1, 2, 3} {type: Location, locations: westus2, type: Zone, locations: westus2, zones: 1, 2, 3}
+virtualMachines Standard_B2als_v2  westus2 {2, 3, 1} type: Zone, locations: westus2, zones: 3, 2
+virtualMachines  Standard_B2as_v2  westus2 {2, 3, 1} type: Zone, locations: westus2, zones: 3, 2
+virtualMachines Standard_B2ats_v2  westus2 {2, 3, 1} type: Zone, locations: westus2, zones: 3, 2
+virtualMachines  Standard_B2ls_v2  westus2 {1, 2, 3} type: Zone, locations: westus2, zones: 3, 2
+virtualMachines     Standard_B2ms  westus2 {1, 2, 3} {type: Location, locations: westus2, type: Zone, locations: westus2, zones: 1, 2, 3}
+virtualMachines Standard_B2pls_v2  westus2 {1, 2, 3} 
+virtualMachines  Standard_B2ps_v2  westus2 {1, 2, 3} 
+virtualMachines Standard_B2pts_v2  westus2 {1, 2, 3} 
+virtualMachines      Standard_B2s  westus2 {1, 2, 3} {type: Location, locations: westus2, type: Zone, locations: westus2, zones: 1, 2, 3}
+virtualMachines   Standard_B2s_v2  westus2 {1, 2, 3} type: Zone, locations: westus2, zones: 3, 2
+virtualMachines  Standard_B2ts_v2  westus2 {1, 2, 3} type: Zone, locations: westus2, zones: 3, 2
+```
+
+37. There two different "Restriction" patterns, but the important value is to look at the list of zones.  So the "Standard_B1s" size is fully restricted or unavailable, While the "Standard_B2pts_v2" is unrestricted or fully available.   While the "Standard_B2s_v2" is restricted from zones 2 and 3, but available in zone 1.  According to Microsoft's advertising for the [Azure student account](https://azure.microsoft.com/en-us/free/students#Free-services1_tab3) the "Standard_B2pts_v2" is in the free tier of services.
 
 ```
 $azVmParams = @{
     ResourceGroupName   = 'ITS-Cloud-Systems'
     Name                = 'del01-testvm-eus-01'
     Credential          = (Get-Credential)
-    Location            = 'eastus'
+    Location            = 'westus2'
     Image               = 'Canonical:ubuntu-24_04-lts:server:latest'
-    Size                = 'Standard_B1s'
+    Size                = 'Standard_B2pts_v2'
     OpenPorts           = 22
     PublicIpAddressName = 'del01-testvm-eus-0101'
 }
@@ -175,11 +224,48 @@ $azVmParams = @{
 
 ```New-AzVm @azVmParams```
 
-34. Yep, it breaks for Brandon at this point. It might be a licensing issue that unique to his user.  Please report to him via Teams if you are able to build a VM.
+34. After a few moments for provisioning, the command will return to the prompt, and the following command will return the IP address that is assigned to this machine.
 
+```Get-AzPublicIpAddress -ResourceGroupName 'ITS-Cloud-Systems-WestUS2' -Name 'del01-testvm-cus-01'```
+
+35. SSH to the machine and gather network and configuration data.
+
+36. Take a look at the machine in VSCode In the Azure tab, look for "Virtual Machines" under the "Azure for Students" 
+
+37. There is a link for "Install Extension" under the virtual machine
+
+38. Once that module reloads, use the right click menu to inspect the options one has to manipulate the VM via VSCode.
+
+39. One of the interesting options is to SSH to the machine, but that requires another module and more ssh configuration that we will tackle later.  
+
+40. This is also a good place to get the IP address for the system.
+
+41. Time to cleanup...
+
+```Remove-AzVM -ResourceGroupName 'ITS-Cloud-Systems-WestUS2' -Name 'del01-testvm-eus-01' -Force```
 
 # A list of failed links and leads
 
 [Deploy a website to Azure with Azure App Service](https://learn.microsoft.com/en-us/training/modules/stage-deploy-app-service-deployment-slots/) Assumes that the user has an account that has slots enabled.
 
+```
+# Get ALL B2-series with full details - no filtering
+$vms = Get-AzComputeResourceSku -Location 'westus2' | 
+    Where-Object {$_.Name -like 'Standard_B2*'}
 
+$results = @()
+foreach ($vm in $vms) {
+    $vcpus = ($vm.Capabilities | Where-Object {$_.Name -eq 'vCPUs'}).Value
+    $memory = ($vm.Capabilities | Where-Object {$_.Name -eq 'MemoryGB'}).Value
+    $restricted = if ($vm.Restrictions) { "Yes: $($vm.Restrictions.ReasonCode -join ', ')" } else { "No" }
+    
+    $results += [PSCustomObject]@{
+        Name = $vm.Name
+        vCPUs = $vcpus
+        'Memory GB' = $memory
+        Restricted = $restricted
+    }
+}
+
+$results | Sort-Object vCPUs, 'Memory GB' | Format-Table -AutoSize
+```
